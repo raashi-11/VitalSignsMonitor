@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vital Signs Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0D1F3C;
+      color: #E8F4FD;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      padding: 16px 0 24px;
+      border-bottom: 1px solid #1A3A5C;
+      margin-bottom: 24px;
+    }
+
+    header h1 { font-size: 22px; font-weight: 600; color: #00BCD4; }
+    header p  { font-size: 13px; color: #78909C; margin-top: 4px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: #1A3A5C;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #243F5E;
+      text-align: center;
+    }
+
+    .card .label  { font-size: 12px; color: #78909C; text-transform: uppercase;
+                    letter-spacing: 1px; margin-bottom: 8px; }
+    .card .value  { font-size: 42px; font-weight: 700; line-height: 1; }
+    .card .unit   { font-size: 14px; color: #78909C; margin-top: 4px; }
+    .card .sub    { font-size: 12px; color: #546E7A; margin-top: 6px; }
+
+    .hr-card   .value { color: #00BCD4; }
+    .temp-card .value { color: #FF7043; }
+    .spo2-card .value { color: #66BB6A; }
+
+    .chart-card {
+      background: #1A3A5C;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #243F5E;
+      margin-bottom: 20px;
+    }
+    .chart-card h3 { font-size: 14px; color: #78909C; margin-bottom: 14px; }
+
+    .fusion-card {
+      background: #1A3A5C;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #243F5E;
+      margin-bottom: 20px;
+    }
+    .fusion-card h3 { font-size: 14px; color: #78909C; margin-bottom: 14px; }
+
+    .weight-bar-container { margin-bottom: 12px; }
+    .weight-label {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: #90A4AE; margin-bottom: 6px;
+    }
+    .weight-bar {
+      height: 16px; border-radius: 8px; background: #0D1F3C;
+      overflow: hidden; display: flex;
+    }
+    .bar-rppg { background: #534AB7; transition: width 0.5s ease; height: 100%; }
+    .bar-hw   { background: #1D9E75; transition: width 0.5s ease; height: 100%; }
+
+    .status-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;
+    }
+    .status-box {
+      background: #0D1F3C; border-radius: 8px; padding: 10px 12px;
+      font-size: 12px; border-left: 3px solid #243F5E;
+    }
+    .status-box.ok     { border-left-color: #1D9E75; }
+    .status-box.warn   { border-left-color: #FF7043; }
+    .status-box .st    { font-weight: 600; margin-bottom: 2px; }
+    .status-box .sd    { color: #78909C; }
+
+    .alerts { margin-bottom: 20px; }
+    .alert-item {
+      background: #7F1D1D;
+      border: 1px solid #EF4444;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      display: none;
+    }
+    .alert-item.visible { display: block; }
+    .alert-item strong  { color: #FCA5A5; }
+
+    #system-status {
+      text-align: center;
+      font-size: 12px;
+      color: #546E7A;
+      padding: 8px;
+    }
+
+    .legend { display: flex; gap: 16px; font-size: 12px; color: #78909C; margin-top: 8px; }
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Smart Non-Contact Vital Signs Monitor</h1>
+  <p>Adaptive rPPG + IR Sensor Fusion · Live Dashboard · No Cloud</p>
+</header>
+
+<!-- Alert cards -->
+<div class="alerts">
+  <div class="alert-item" id="alert-hr-high">
+    <strong>⚠ Alert:</strong> Heart Rate too HIGH — <span id="alert-hr-high-val"></span> bpm (threshold: &gt;120)
+  </div>
+  <div class="alert-item" id="alert-hr-low">
+    <strong>⚠ Alert:</strong> Heart Rate too LOW — <span id="alert-hr-low-val"></span> bpm (threshold: &lt;45)
+  </div>
+  <div class="alert-item" id="alert-temp">
+    <strong>🌡 Alert:</strong> High Temperature — <span id="alert-temp-val"></span>°C (Fever threshold: 38.5°C)
+  </div>
+  <div class="alert-item" id="alert-spo2">
+    <strong>💧 Alert:</strong> Low SpO2 — <span id="alert-spo2-val"></span>% (threshold: &lt;90%)
+  </div>
+</div>
+
+<!-- Vital signs cards -->
+<div class="grid">
+  <div class="card hr-card">
+    <div class="label">Heart Rate (Fused)</div>
+    <div class="value" id="hr-val">--</div>
+    <div class="unit">bpm</div>
+    <div class="sub">rPPG: <span id="hr-rppg">--</span> | HW: <span id="hr-hw">--</span></div>
+  </div>
+  <div class="card temp-card">
+    <div class="label">Body Temperature</div>
+    <div class="value" id="temp-val">--</div>
+    <div class="unit">°C</div>
+    <div class="sub">MLX90614 IR · Non-contact</div>
+  </div>
+  <div class="card spo2-card">
+    <div class="label">Blood Oxygen (SpO2)</div>
+    <div class="value" id="spo2-val">--</div>
+    <div class="unit">%</div>
+    <div class="sub">MAX30102 reference</div>
+  </div>
+</div>
+
+<!-- HR trend chart -->
+<div class="chart-card">
+  <h3>Heart Rate Trend — Last 60 seconds</h3>
+  <canvas id="hrChart" height="80"></canvas>
+  <div class="legend">
+    <span><span class="dot" style="background:#00BCD4"></span>Fused HR</span>
+    <span><span class="dot" style="background:#534AB7"></span>rPPG HR</span>
+    <span><span class="dot" style="background:#1D9E75"></span>Hardware HR</span>
+  </div>
+</div>
+
+<!-- Fusion engine status -->
+<div class="fusion-card">
+  <h3>Fusion Engine — Sensor Trust Weight</h3>
+  <div class="weight-bar-container">
+    <div class="weight-label">
+      <span>📷 Webcam rPPG</span>
+      <span id="w-rppg-pct">50%</span>
+      <span id="w-hw-pct">50%</span>
+      <span>🔌 Hardware ESP32</span>
+    </div>
+    <div class="weight-bar">
+      <div class="bar-rppg" id="bar-rppg" style="width:50%"></div>
+      <div class="bar-hw"   id="bar-hw"   style="width:50%"></div>
+    </div>
+  </div>
+  <div class="status-row">
+    <div class="status-box" id="rppg-status-box">
+      <div class="st">rPPG (Webcam)</div>
+      <div class="sd" id="rppg-status-text">Initialising...</div>
+    </div>
+    <div class="status-box" id="hw-status-box">
+      <div class="st">Hardware (ESP32)</div>
+      <div class="sd" id="hw-status-text">Initialising...</div>
+    </div>
+  </div>
+</div>
+
+<div id="system-status">System status: Starting up...</div>
+
+<script>
+  // ── Chart setup ───────────────────────────────────────────────
+  const MAX_POINTS = 60;
+  const labels = Array(MAX_POINTS).fill('');
+  const fusedData = Array(MAX_POINTS).fill(null);
+  const rppgData  = Array(MAX_POINTS).fill(null);
+  const hwData    = Array(MAX_POINTS).fill(null);
+
+  const ctx = document.getElementById('hrChart').getContext('2d');
+  const hrChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Fused HR',    data: fusedData, borderColor: '#00BCD4',
+          borderWidth: 2.5, pointRadius: 0, tension: 0.4, fill: false },
+        { label: 'rPPG HR',     data: rppgData,  borderColor: '#534AB7',
+          borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false,
+          borderDash: [4,4] },
+        { label: 'Hardware HR', data: hwData,    borderColor: '#1D9E75',
+          borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false,
+          borderDash: [4,4] },
+      ]
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      scales: {
+        x: { display: false },
+        y: {
+          min: 40, max: 140,
+          ticks: { color: '#78909C', font: { size: 11 } },
+          grid:  { color: '#1A3A5C' }
+        }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // ── Fetch and update every 1 second ──────────────────────────
+  async function updateDashboard() {
+    try {
+      const resp = await fetch('/vitals');
+      const d    = await resp.json();
+
+      // Vital sign cards
+      document.getElementById('hr-val').textContent   = d.hr_fused   || '--';
+      document.getElementById('hr-rppg').textContent  = d.hr_rppg    || '--';
+      document.getElementById('hr-hw').textContent    = d.hr_hw      || '--';
+      document.getElementById('temp-val').textContent = d.temperature_c || '--';
+      document.getElementById('spo2-val').textContent = d.spo2_percent  || '--';
+
+      // Color-code temperature
+      const tv = parseFloat(d.temperature_c);
+      document.querySelector('.temp-card .value').style.color =
+        tv >= 38.5 ? '#EF4444' : tv >= 37.5 ? '#FFA726' : '#FF7043';
+
+      // Color-code SpO2
+      document.querySelector('.spo2-card .value').style.color =
+        parseFloat(d.spo2_percent) < 90 ? '#EF4444' : '#66BB6A';
+
+      // Weight bar
+      const rPct = Math.round((d.w_rppg || 0.5) * 100);
+      const hPct = 100 - rPct;
+      document.getElementById('bar-rppg').style.width  = rPct + '%';
+      document.getElementById('bar-hw').style.width    = hPct + '%';
+      document.getElementById('w-rppg-pct').textContent = rPct + '%';
+      document.getElementById('w-hw-pct').textContent   = hPct + '%';
+
+      // Status boxes
+      const rppgOk = !d.rppg_status || d.rppg_status === 'OK';
+      const hwOk   = !d.hw_status   || d.hw_status   === 'OK';
+      document.getElementById('rppg-status-text').textContent =
+        d.rppg_status || 'Unknown';
+      document.getElementById('hw-status-text').textContent =
+        d.hw_status   || 'Unknown';
+      document.getElementById('rppg-status-box').className =
+        'status-box ' + (rppgOk ? 'ok' : 'warn');
+      document.getElementById('hw-status-box').className =
+        'status-box ' + (hwOk ? 'ok' : 'warn');
+
+      // System status
+      document.getElementById('system-status').textContent =
+        'System: ' + (d.system_status || 'Running');
+
+      // Alerts
+      function setAlert(id, visible, valId, val) {
+        const el = document.getElementById(id);
+        el.classList.toggle('visible', visible);
+        if (valId) document.getElementById(valId).textContent = val;
+      }
+      setAlert('alert-hr-high', d.alert_hr_high, 'alert-hr-high-val', d.hr_fused);
+      setAlert('alert-hr-low',  d.alert_hr_low,  'alert-hr-low-val',  d.hr_fused);
+      setAlert('alert-temp',    d.alert_temp,    'alert-temp-val',    d.temperature_c);
+      setAlert('alert-spo2',    d.alert_spo2,    'alert-spo2-val',    d.spo2_percent);
+
+      // Chart update
+      fusedData.push(d.hr_fused || null);
+      rppgData.push(d.hr_rppg   || null);
+      hwData.push(d.hr_hw       || null);
+      if (fusedData.length > MAX_POINTS) {
+        fusedData.shift(); rppgData.shift(); hwData.shift();
+      }
+      hrChart.update();
+
+    } catch (err) {
+      document.getElementById('system-status').textContent =
+        'Dashboard error — is main.py running? ' + err;
+    }
+  }
+
+  // Start polling
+  setInterval(updateDashboard, 1000);
+  updateDashboard();
+</script>
+
+</body>
+</html>
