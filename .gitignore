@@ -1,0 +1,30 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment (if you create one later)
+venv/
+env/
+.env/
+
+# VS Code settings
+.vscode/
+
+# Data logs — don't push patient data to GitHub
+data/*.csv
+data/*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Jupyter notebooks (if used)
+.ipynb_checkpoints/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
