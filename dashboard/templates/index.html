@@ -1,215 +1,283 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vital Signs Monitor</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vital Signs Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg:      #0A1628;
+    --surface: #0F2040;
+    --card:    #142850;
+    --border:  #1E3A5F;
+    --teal:    #00C9A7;
+    --blue:    #4DA6FF;
+    --amber:   #FFB347;
+    --red:     #FF5C5C;
+    --green:   #4CAF82;
+    --muted:   #6B8CAE;
+    --text:    #E8F4FD;
+    --sub:     #8BAFC8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 0; }
 
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #0D1F3C;
-      color: #E8F4FD;
-      min-height: 100vh;
-      padding: 20px;
-    }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-left h1 { font-size: 16px; font-weight: 600; color: var(--teal); letter-spacing: 0.5px; }
+  .header-left p  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .header-right   { display: flex; align-items: center; gap: 10px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+  .live-label { font-size: 12px; color: var(--teal); font-weight: 500; }
+  #clock { font-size: 12px; color: var(--muted); }
 
-    header {
-      text-align: center;
-      padding: 16px 0 24px;
-      border-bottom: 1px solid #1A3A5C;
-      margin-bottom: 24px;
-    }
+  main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
 
-    header h1 { font-size: 22px; font-weight: 600; color: #00BCD4; }
-    header p  { font-size: 13px; color: #78909C; margin-top: 4px; }
+  .alerts { margin-bottom: 16px; }
+  .alert-box {
+    display: none;
+    background: rgba(255,92,92,0.12);
+    border: 1px solid rgba(255,92,92,0.4);
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #FFAAAA;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .alert-box.hidden { display: none; }
+  .alert-icon { font-size: 16px; }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 20px;
-    }
+  .grid-top { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 
-    .card {
-      background: #1A3A5C;
-      border-radius: 12px;
-      padding: 20px;
-      border: 1px solid #243F5E;
-      text-align: center;
-    }
+  .vital-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .vital-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 3px;
+    border-radius: 14px 14px 0 0;
+  }
+  .vital-card.hr::before   { background: var(--teal); }
+  .vital-card.temp::before { background: var(--amber); }
 
-    .card .label  { font-size: 12px; color: #78909C; text-transform: uppercase;
-                    letter-spacing: 1px; margin-bottom: 8px; }
-    .card .value  { font-size: 42px; font-weight: 700; line-height: 1; }
-    .card .unit   { font-size: 14px; color: #78909C; margin-top: 4px; }
-    .card .sub    { font-size: 12px; color: #546E7A; margin-top: 6px; }
+  .vital-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .vital-row   { display: flex; align-items: flex-end; gap: 10px; }
+  .vital-value { font-size: 52px; font-weight: 700; line-height: 1; }
+  .vital-unit  { font-size: 16px; color: var(--sub); margin-bottom: 8px; }
+  .vital-sub   { font-size: 12px; color: var(--sub); margin-top: 8px; }
 
-    .hr-card   .value { color: #00BCD4; }
-    .temp-card .value { color: #FF7043; }
-    .spo2-card .value { color: #66BB6A; }
+  .vital-card.hr   .vital-value { color: var(--teal); }
+  .vital-card.temp .vital-value { color: var(--amber); }
 
-    .chart-card {
-      background: #1A3A5C;
-      border-radius: 12px;
-      padding: 20px;
-      border: 1px solid #243F5E;
-      margin-bottom: 20px;
-    }
-    .chart-card h3 { font-size: 14px; color: #78909C; margin-bottom: 14px; }
+  .snr-bar-wrap { margin-top: 12px; }
+  .snr-bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); margin-bottom: 5px; }
+  .snr-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .snr-fill  { height: 100%; border-radius: 3px; background: var(--teal); transition: width .6s ease; }
 
-    .fusion-card {
-      background: #1A3A5C;
-      border-radius: 12px;
-      padding: 20px;
-      border: 1px solid #243F5E;
-      margin-bottom: 20px;
-    }
-    .fusion-card h3 { font-size: 14px; color: #78909C; margin-bottom: 14px; }
+  .temp-status {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+  }
 
-    .weight-bar-container { margin-bottom: 12px; }
-    .weight-label {
-      display: flex; justify-content: space-between;
-      font-size: 12px; color: #90A4AE; margin-bottom: 6px;
-    }
-    .weight-bar {
-      height: 16px; border-radius: 8px; background: #0D1F3C;
-      overflow: hidden; display: flex;
-    }
-    .bar-rppg { background: #534AB7; transition: width 0.5s ease; height: 100%; }
-    .bar-hw   { background: #1D9E75; transition: width 0.5s ease; height: 100%; }
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+  .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .chart-title  { font-size: 13px; font-weight: 500; color: var(--text); }
+  .chart-legend { display: flex; gap: 12px; }
+  .legend-item  { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--sub); }
+  .legend-dot   { width: 8px; height: 8px; border-radius: 50%; }
 
-    .status-row {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;
-    }
-    .status-box {
-      background: #0D1F3C; border-radius: 8px; padding: 10px 12px;
-      font-size: 12px; border-left: 3px solid #243F5E;
-    }
-    .status-box.ok     { border-left-color: #1D9E75; }
-    .status-box.warn   { border-left-color: #FF7043; }
-    .status-box .st    { font-weight: 600; margin-bottom: 2px; }
-    .status-box .sd    { color: #78909C; }
+  .grid-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-    .alerts { margin-bottom: 20px; }
-    .alert-item {
-      background: #7F1D1D;
-      border: 1px solid #EF4444;
-      border-radius: 8px;
-      padding: 12px 16px;
-      margin-bottom: 8px;
-      font-size: 13px;
-      display: none;
-    }
-    .alert-item.visible { display: block; }
-    .alert-item strong  { color: #FCA5A5; }
+  .status-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 22px;
+  }
+  .status-title { font-size: 13px; font-weight: 500; margin-bottom: 14px; color: var(--sub); }
+  .status-row   { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .status-row:last-child { border-bottom: none; }
+  .status-indicator { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-indicator.ok   { background: var(--teal); }
+  .status-indicator.warn { background: var(--amber); }
+  .status-indicator.off  { background: var(--red); }
+  .status-name  { font-size: 13px; color: var(--text); flex: 1; }
+  .status-val   { font-size: 12px; color: var(--sub); }
 
-    #system-status {
-      text-align: center;
-      font-size: 12px;
-      color: #546E7A;
-      padding: 8px;
-    }
+  .log-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 22px;
+    overflow: hidden;
+  }
+  .log-title  { font-size: 13px; font-weight: 500; color: var(--sub); margin-bottom: 12px; }
+  .log-list   { max-height: 160px; overflow-y: auto; }
+  .log-item   { font-size: 11px; color: var(--sub); padding: 4px 0; border-bottom: 1px solid var(--border); font-family: monospace; }
+  .log-item:last-child { border-bottom: none; }
+  .log-time   { color: var(--muted); margin-right: 6px; }
+  .log-item.alert-log { color: #FFAAAA; }
 
-    .legend { display: flex; gap: 16px; font-size: 12px; color: #78909C; margin-top: 8px; }
-    .legend span { display: flex; align-items: center; gap: 6px; }
-    .dot { width: 10px; height: 10px; border-radius: 50%; }
-  </style>
+  footer {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+  }
+  .footer-text { font-size: 11px; color: var(--muted); }
+  #sys-status  { font-size: 11px; color: var(--teal); }
+</style>
 </head>
 <body>
 
 <header>
-  <h1>Smart Non-Contact Vital Signs Monitor</h1>
-  <p>Adaptive rPPG + IR Sensor Fusion · Live Dashboard · No Cloud</p>
+  <div class="header-left">
+    <h1>Smart Non-Contact Vital Signs Monitor</h1>
+    <p>rPPG Camera · MLX90614 IR Thermometer · No cloud · Real-time edge processing</p>
+  </div>
+  <div class="header-right">
+    <div class="live-dot"></div>
+    <span class="live-label">LIVE</span>
+    <span id="clock">--:--:--</span>
+  </div>
 </header>
 
-<!-- Alert cards -->
-<div class="alerts">
-  <div class="alert-item" id="alert-hr-high">
-    <strong>⚠ Alert:</strong> Heart Rate too HIGH — <span id="alert-hr-high-val"></span> bpm (threshold: &gt;120)
-  </div>
-  <div class="alert-item" id="alert-hr-low">
-    <strong>⚠ Alert:</strong> Heart Rate too LOW — <span id="alert-hr-low-val"></span> bpm (threshold: &lt;45)
-  </div>
-  <div class="alert-item" id="alert-temp">
-    <strong>🌡 Alert:</strong> High Temperature — <span id="alert-temp-val"></span>°C (Fever threshold: 38.5°C)
-  </div>
-  <div class="alert-item" id="alert-spo2">
-    <strong>💧 Alert:</strong> Low SpO2 — <span id="alert-spo2-val"></span>% (threshold: &lt;90%)
-  </div>
-</div>
+<main>
 
-<!-- Vital signs cards -->
-<div class="grid">
-  <div class="card hr-card">
-    <div class="label">Heart Rate (Fused)</div>
-    <div class="value" id="hr-val">--</div>
-    <div class="unit">bpm</div>
-    <div class="sub">rPPG: <span id="hr-rppg">--</span> | HW: <span id="hr-hw">--</span></div>
-  </div>
-  <div class="card temp-card">
-    <div class="label">Body Temperature</div>
-    <div class="value" id="temp-val">--</div>
-    <div class="unit">°C</div>
-    <div class="sub">MLX90614 IR · Non-contact</div>
-  </div>
-  <div class="card spo2-card">
-    <div class="label">Blood Oxygen (SpO2)</div>
-    <div class="value" id="spo2-val">--</div>
-    <div class="unit">%</div>
-    <div class="sub">MAX30102 reference</div>
-  </div>
-</div>
-
-<!-- HR trend chart -->
-<div class="chart-card">
-  <h3>Heart Rate Trend — Last 60 seconds</h3>
-  <canvas id="hrChart" height="80"></canvas>
-  <div class="legend">
-    <span><span class="dot" style="background:#00BCD4"></span>Fused HR</span>
-    <span><span class="dot" style="background:#534AB7"></span>rPPG HR</span>
-    <span><span class="dot" style="background:#1D9E75"></span>Hardware HR</span>
-  </div>
-</div>
-
-<!-- Fusion engine status -->
-<div class="fusion-card">
-  <h3>Fusion Engine — Sensor Trust Weight</h3>
-  <div class="weight-bar-container">
-    <div class="weight-label">
-      <span>📷 Webcam rPPG</span>
-      <span id="w-rppg-pct">50%</span>
-      <span id="w-hw-pct">50%</span>
-      <span>🔌 Hardware ESP32</span>
+  <div class="alerts">
+    <div class="alert-box hidden" id="alert-hr-high">
+      <span class="alert-icon">⚠</span>
+      <span>High Heart Rate — <strong id="a-hr-high-val"></strong> bpm detected (threshold: &gt;120 bpm)</span>
     </div>
-    <div class="weight-bar">
-      <div class="bar-rppg" id="bar-rppg" style="width:50%"></div>
-      <div class="bar-hw"   id="bar-hw"   style="width:50%"></div>
+    <div class="alert-box hidden" id="alert-hr-low">
+      <span class="alert-icon">⚠</span>
+      <span>Low Heart Rate — <strong id="a-hr-low-val"></strong> bpm detected (threshold: &lt;45 bpm)</span>
+    </div>
+    <div class="alert-box hidden" id="alert-temp">
+      <span class="alert-icon">🌡</span>
+      <span>High Temperature — <strong id="a-temp-val"></strong>°C detected (fever threshold: 38.5°C)</span>
     </div>
   </div>
-  <div class="status-row">
-    <div class="status-box" id="rppg-status-box">
-      <div class="st">rPPG (Webcam)</div>
-      <div class="sd" id="rppg-status-text">Initialising...</div>
-    </div>
-    <div class="status-box" id="hw-status-box">
-      <div class="st">Hardware (ESP32)</div>
-      <div class="sd" id="hw-status-text">Initialising...</div>
-    </div>
-  </div>
-</div>
 
-<div id="system-status">System status: Starting up...</div>
+  <div class="grid-top">
+
+    <div class="vital-card hr">
+      <div class="vital-label">Heart Rate — rPPG (webcam)</div>
+      <div class="vital-row">
+        <div class="vital-value" id="hr-val">--</div>
+        <div class="vital-unit">bpm</div>
+      </div>
+      <div class="vital-sub">Signal quality: <span id="sig-quality">Collecting data...</span></div>
+      <div class="snr-bar-wrap">
+        <div class="snr-bar-label">
+          <span>Signal confidence (SNR)</span>
+          <span id="snr-pct">0%</span>
+        </div>
+        <div class="snr-track"><div class="snr-fill" id="snr-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="vital-card temp">
+      <div class="vital-label">Body Temperature — MLX90614 IR (non-contact)</div>
+      <div class="vital-row">
+        <div class="vital-value" id="temp-val">--</div>
+        <div class="vital-unit">°C</div>
+      </div>
+      <div>
+        <span class="temp-status" id="temp-badge" style="background:rgba(255,255,255,0.08);color:var(--sub)">Awaiting reading</span>
+      </div>
+      <div class="vital-sub" style="margin-top:10px">Ambient: <span id="ambient-val">--</span>°C</div>
+    </div>
+
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Heart Rate — 60 second trend</div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Heart Rate</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(0,201,167,0.2)"></div>Normal range (60–100 bpm)</div>
+      </div>
+    </div>
+    <canvas id="hrChart" height="70"></canvas>
+  </div>
+
+  <div class="grid-bottom">
+
+    <div class="status-card">
+      <div class="status-title">Sensor status</div>
+      <div class="status-row">
+        <div class="status-indicator ok" id="dot-rppg"></div>
+        <div class="status-name">Webcam rPPG (heart rate)</div>
+        <div class="status-val" id="txt-rppg">Initialising</div>
+      </div>
+      <div class="status-row">
+        <div class="status-indicator ok" id="dot-hw"></div>
+        <div class="status-name">MLX90614 IR (temperature)</div>
+        <div class="status-val" id="txt-hw">Initialising</div>
+      </div>
+      <div class="status-row">
+        <div class="status-indicator warn"></div>
+        <div class="status-name">MAX30102 (SpO2)</div>
+        <div class="status-val" style="color:var(--red)">Hardware damaged</div>
+      </div>
+      <div class="status-row">
+        <div class="status-indicator ok"></div>
+        <div class="status-name">Flask server</div>
+        <div class="status-val" style="color:var(--teal)">Running</div>
+      </div>
+    </div>
+
+    <div class="log-card">
+      <div class="log-title">Live event log</div>
+      <div class="log-list" id="log-list"></div>
+    </div>
+
+  </div>
+
+</main>
+
+<footer>
+  <div class="footer-text">Smart Non-Contact Vital Signs Monitor · 4th Semester Interdisciplinary Project · 2025–26</div>
+  <div id="sys-status">Starting up...</div>
+</footer>
 
 <script>
-  // ── Chart setup ───────────────────────────────────────────────
-  const MAX_POINTS = 60;
-  const labels = Array(MAX_POINTS).fill('');
-  const fusedData = Array(MAX_POINTS).fill(null);
-  const rppgData  = Array(MAX_POINTS).fill(null);
-  const hwData    = Array(MAX_POINTS).fill(null);
+  const MAX_PTS = 60;
+  const hrData  = Array(MAX_PTS).fill(null);
+  const labels  = Array(MAX_PTS).fill('');
+  const logs    = [];
 
   const ctx = document.getElementById('hrChart').getContext('2d');
   const hrChart = new Chart(ctx, {
@@ -217,107 +285,142 @@
     data: {
       labels,
       datasets: [
-        { label: 'Fused HR',    data: fusedData, borderColor: '#00BCD4',
-          borderWidth: 2.5, pointRadius: 0, tension: 0.4, fill: false },
-        { label: 'rPPG HR',     data: rppgData,  borderColor: '#534AB7',
-          borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false,
-          borderDash: [4,4] },
-        { label: 'Hardware HR', data: hwData,    borderColor: '#1D9E75',
-          borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false,
-          borderDash: [4,4] },
+        {
+          label: 'Normal range',
+          data: Array(MAX_PTS).fill(100),
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(0,201,167,0.06)',
+          pointRadius: 0,
+          fill: { target: { value: 60 }, above: 'rgba(0,201,167,0.06)' },
+          tension: 0
+        },
+        {
+          label: 'HR',
+          data: hrData,
+          borderColor: '#00C9A7',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: false
+        }
       ]
     },
     options: {
       animation: false,
       responsive: true,
+      interaction: { intersect: false },
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ctx.parsed.y ? `${ctx.parsed.y.toFixed(1)} bpm` : '' }
+      }},
       scales: {
         x: { display: false },
         y: {
           min: 40, max: 140,
-          ticks: { color: '#78909C', font: { size: 11 } },
-          grid:  { color: '#1A3A5C' }
+          ticks: { color: '#6B8CAE', font: { size: 11 }, stepSize: 20 },
+          grid:  { color: 'rgba(30,58,95,0.8)' }
         }
-      },
-      plugins: { legend: { display: false } }
+      }
     }
   });
 
-  // ── Fetch and update every 1 second ──────────────────────────
-  async function updateDashboard() {
+  function addLog(msg, isAlert = false) {
+    const now = new Date().toLocaleTimeString();
+    logs.unshift({ time: now, msg, isAlert });
+    if (logs.length > 40) logs.pop();
+    const list = document.getElementById('log-list');
+    list.innerHTML = logs.map(l =>
+      `<div class="log-item${l.isAlert ? ' alert-log' : ''}"><span class="log-time">${l.time}</span>${l.msg}</div>`
+    ).join('');
+  }
+
+  function setAlert(id, visible, valId, val) {
+    const el = document.getElementById(id);
+    el.classList.toggle('hidden', !visible);
+    el.style.display = visible ? 'flex' : 'none';
+    if (valId && val !== undefined) document.getElementById(valId).textContent = val;
+  }
+
+  function updateClock() {
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+  }
+  setInterval(updateClock, 1000);
+
+  async function update() {
     try {
       const resp = await fetch('/vitals');
-      const d    = await resp.json();
+      const d = await resp.json();
+      if (d.error) return;
 
-      // Vital sign cards
-      document.getElementById('hr-val').textContent   = d.hr_fused   || '--';
-      document.getElementById('hr-rppg').textContent  = d.hr_rppg    || '--';
-      document.getElementById('hr-hw').textContent    = d.hr_hw      || '--';
-      document.getElementById('temp-val').textContent = d.temperature_c || '--';
-      document.getElementById('spo2-val').textContent = d.spo2_percent  || '--';
+      const hr   = parseFloat(d.hr_bpm)   || 0;
+      const temp = parseFloat(d.temperature_c) || 0;
+      const amb  = parseFloat(d.ambient_c) || 0;
+      const snr  = parseFloat(d.snr_rppg) || 0;
 
-      // Color-code temperature
-      const tv = parseFloat(d.temperature_c);
-      document.querySelector('.temp-card .value').style.color =
-        tv >= 38.5 ? '#EF4444' : tv >= 37.5 ? '#FFA726' : '#FF7043';
+      document.getElementById('hr-val').textContent    = hr > 0 ? hr.toFixed(1) : '--';
+      document.getElementById('temp-val').textContent  = temp > 0 ? temp.toFixed(1) : '--';
+      document.getElementById('ambient-val').textContent = amb > 0 ? amb.toFixed(1) : '--';
+      document.getElementById('sig-quality').textContent = d.signal_quality || '--';
 
-      // Color-code SpO2
-      document.querySelector('.spo2-card .value').style.color =
-        parseFloat(d.spo2_percent) < 90 ? '#EF4444' : '#66BB6A';
+      const snrPct = Math.min(Math.round(snr * 10), 100);
+      document.getElementById('snr-fill').style.width = snrPct + '%';
+      document.getElementById('snr-pct').textContent  = snrPct + '%';
+      const snrFill = document.getElementById('snr-fill');
+      snrFill.style.background = snrPct > 60 ? '#00C9A7' : snrPct > 30 ? '#FFB347' : '#FF5C5C';
 
-      // Weight bar
-      const rPct = Math.round((d.w_rppg || 0.5) * 100);
-      const hPct = 100 - rPct;
-      document.getElementById('bar-rppg').style.width  = rPct + '%';
-      document.getElementById('bar-hw').style.width    = hPct + '%';
-      document.getElementById('w-rppg-pct').textContent = rPct + '%';
-      document.getElementById('w-hw-pct').textContent   = hPct + '%';
-
-      // Status boxes
-      const rppgOk = !d.rppg_status || d.rppg_status === 'OK';
-      const hwOk   = !d.hw_status   || d.hw_status   === 'OK';
-      document.getElementById('rppg-status-text').textContent =
-        d.rppg_status || 'Unknown';
-      document.getElementById('hw-status-text').textContent =
-        d.hw_status   || 'Unknown';
-      document.getElementById('rppg-status-box').className =
-        'status-box ' + (rppgOk ? 'ok' : 'warn');
-      document.getElementById('hw-status-box').className =
-        'status-box ' + (hwOk ? 'ok' : 'warn');
-
-      // System status
-      document.getElementById('system-status').textContent =
-        'System: ' + (d.system_status || 'Running');
-
-      // Alerts
-      function setAlert(id, visible, valId, val) {
-        const el = document.getElementById(id);
-        el.classList.toggle('visible', visible);
-        if (valId) document.getElementById(valId).textContent = val;
+      const badge = document.getElementById('temp-badge');
+      if (temp === 0) {
+        badge.style.background = 'rgba(255,255,255,0.08)';
+        badge.style.color      = 'var(--sub)';
+        badge.textContent      = 'Awaiting reading';
+      } else if (temp >= 38.5) {
+        badge.style.background = 'rgba(255,92,92,0.2)';
+        badge.style.color      = '#FF5C5C';
+        badge.textContent      = '🔴 Fever';
+      } else if (temp >= 37.5) {
+        badge.style.background = 'rgba(255,179,71,0.2)';
+        badge.style.color      = '#FFB347';
+        badge.textContent      = '🟡 Slightly elevated';
+      } else {
+        badge.style.background = 'rgba(0,201,167,0.15)';
+        badge.style.color      = '#00C9A7';
+        badge.textContent      = '🟢 Normal';
       }
-      setAlert('alert-hr-high', d.alert_hr_high, 'alert-hr-high-val', d.hr_fused);
-      setAlert('alert-hr-low',  d.alert_hr_low,  'alert-hr-low-val',  d.hr_fused);
-      setAlert('alert-temp',    d.alert_temp,    'alert-temp-val',    d.temperature_c);
-      setAlert('alert-spo2',    d.alert_spo2,    'alert-spo2-val',    d.spo2_percent);
 
-      // Chart update
-      fusedData.push(d.hr_fused || null);
-      rppgData.push(d.hr_rppg   || null);
-      hwData.push(d.hr_hw       || null);
-      if (fusedData.length > MAX_POINTS) {
-        fusedData.shift(); rppgData.shift(); hwData.shift();
-      }
-      hrChart.update();
+      const rppgOk = d.rppg_status === 'OK';
+      const hwOk   = d.hw_status && d.hw_status.includes('active');
+      document.getElementById('dot-rppg').className = 'status-indicator ' + (rppgOk ? 'ok' : 'warn');
+      document.getElementById('dot-hw').className   = 'status-indicator ' + (hwOk   ? 'ok' : 'off');
+      document.getElementById('txt-rppg').textContent = rppgOk ? 'Active' : 'Degraded';
+      document.getElementById('txt-hw').textContent   = hwOk   ? 'Connected' : 'Offline';
+      document.getElementById('txt-rppg').style.color = rppgOk ? 'var(--teal)' : 'var(--amber)';
+      document.getElementById('txt-hw').style.color   = hwOk   ? 'var(--teal)' : 'var(--red)';
+
+      document.getElementById('sys-status').textContent = d.system_status || 'Running';
+
+      setAlert('alert-hr-high', d.alert_hr_high, 'a-hr-high-val', hr.toFixed(1));
+      setAlert('alert-hr-low',  d.alert_hr_low,  'a-hr-low-val',  hr.toFixed(1));
+      setAlert('alert-temp',    d.alert_temp,    'a-temp-val',    temp.toFixed(1));
+
+      if (d.alert_hr_high) addLog(`High HR alert: ${hr.toFixed(1)} bpm`, true);
+      if (d.alert_temp)    addLog(`High temp alert: ${temp.toFixed(1)}°C`, true);
+
+      hrData.push(hr > 0 ? hr : null);
+      if (hrData.length > MAX_PTS) hrData.shift();
+      hrChart.data.datasets[1].data = [...hrData];
+      hrChart.update('none');
 
     } catch (err) {
-      document.getElementById('system-status').textContent =
-        'Dashboard error — is main.py running? ' + err;
+      document.getElementById('sys-status').textContent = 'Connection error — is main.py running?';
     }
   }
 
-  // Start polling
-  setInterval(updateDashboard, 1000);
-  updateDashboard();
-</script>
+  addLog('System started. Webcam rPPG initialising...');
+  addLog('MLX90614 IR temperature sensor ready.');
+  addLog('MAX30102 excluded — hardware damaged.');
+  addLog('Waiting for face detection...');
 
+  setInterval(update, 1000);
+  update();
+</script>
 </body>
 </html>
