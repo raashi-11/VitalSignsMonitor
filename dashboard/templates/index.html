@@ -43,7 +43,6 @@
 
   .alerts { margin-bottom: 16px; }
   .alert-box {
-    display: none;
     background: rgba(255,92,92,0.12);
     border: 1px solid rgba(255,92,92,0.4);
     border-radius: 10px;
@@ -51,11 +50,11 @@
     margin-bottom: 8px;
     font-size: 13px;
     color: #FFAAAA;
-    display: flex;
+    display: none;
     align-items: center;
     gap: 10px;
   }
-  .alert-box.hidden { display: none; }
+  .alert-box.active { display: flex; }
   .alert-icon { font-size: 16px; }
 
   .grid-top { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
@@ -176,15 +175,15 @@
 <main>
 
   <div class="alerts">
-    <div class="alert-box hidden" id="alert-hr-high">
+    <div class="alert-box" id="alert-hr-high">
       <span class="alert-icon">⚠</span>
       <span>High Heart Rate — <strong id="a-hr-high-val"></strong> bpm detected (threshold: &gt;120 bpm)</span>
     </div>
-    <div class="alert-box hidden" id="alert-hr-low">
+    <div class="alert-box" id="alert-hr-low">
       <span class="alert-icon">⚠</span>
       <span>Low Heart Rate — <strong id="a-hr-low-val"></strong> bpm detected (threshold: &lt;45 bpm)</span>
     </div>
-    <div class="alert-box hidden" id="alert-temp">
+    <div class="alert-box" id="alert-temp">
       <span class="alert-icon">🌡</span>
       <span>High Temperature — <strong id="a-temp-val"></strong>°C detected (fever threshold: 38.5°C)</span>
     </div>
@@ -335,8 +334,7 @@
 
   function setAlert(id, visible, valId, val) {
     const el = document.getElementById(id);
-    el.classList.toggle('hidden', !visible);
-    el.style.display = visible ? 'flex' : 'none';
+    el.classList.toggle('active', visible);
     if (valId && val !== undefined) document.getElementById(valId).textContent = val;
   }
 
@@ -349,7 +347,6 @@
     try {
       const resp = await fetch('/vitals');
       const d = await resp.json();
-      if (d.error) return;
 
       const hr   = parseFloat(d.hr_bpm)   || 0;
       const temp = parseFloat(d.temperature_c) || 0;
@@ -404,8 +401,14 @@
       if (d.alert_hr_high) addLog(`High HR alert: ${hr.toFixed(1)} bpm`, true);
       if (d.alert_temp)    addLog(`High temp alert: ${temp.toFixed(1)}°C`, true);
 
+      // Update chart data — keep arrays in sync
       hrData.push(hr > 0 ? hr : null);
       if (hrData.length > MAX_PTS) hrData.shift();
+
+      // Rebuild labels to match data length
+      const chartLabels = Array(hrData.length).fill('');
+      hrChart.data.labels = chartLabels;
+      hrChart.data.datasets[0].data = Array(hrData.length).fill(100);
       hrChart.data.datasets[1].data = [...hrData];
       hrChart.update('none');
 
